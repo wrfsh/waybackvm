@@ -26,6 +26,8 @@ endif
 OBJS := $(patsubst %.c,$(BINDIR)/%.o,$(SRCS))
 TARGET := $(BINDIR)/wbvm
 
+BIOS := $(BINDIR)/bios.bin
+
 debug: CFLAGS += $(DEBUG_CFLAGS)
 release: CFLAGS += $(RELEASE_CFLAGS)
 debug release: $(TARGET)
@@ -36,11 +38,20 @@ $(BINDIR):
 $(BINDIR)/%.o:%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(TARGET): $(BINDIR) $(HDRS) $(OBJS)
+$(BIOS): seabios.config
+	cp seabios.config seabios/.config
+	make -C seabios/
+	mv seabios/out/bios.bin $@
+
+$(TARGET): $(BINDIR) $(BIOS) $(HDRS) $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
 clean:
-	rm -rf $(BINDIR)
+	rm -rf $(OBJS) $(TARGET)
 
-.PHONY: debug release test clean
+clean_all:
+	rm -rf $(BINDIR)
+	make -C seabios/ clean
+
+.PHONY: debug release test clean clean_all
 .DEFAULT_GOAL := debug
