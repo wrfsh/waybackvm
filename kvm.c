@@ -7,6 +7,7 @@
 
 static int g_kvmfd = -1;
 static int g_max_vcpus;
+static int g_max_memslots;
 
 int kvm_ioctl(unsigned long request, uintptr_t arg)
 {
@@ -39,7 +40,11 @@ int kvm_vm_ioctl(int vmfd, unsigned long request, uintptr_t arg)
 int kvm_vm_ioctl_nofail(int vmfd, unsigned long request, uintptr_t arg)
 {
     int ret = kvm_vm_ioctl(vmfd, request, arg);
-    WBVM_VERIFY(ret >= 0);
+    if (ret < 0) {
+        WBVM_LOG_ERROR2(ret, "KVM VM ioctl failed");
+        WBVM_VERIFY(ret >= 0);
+    }
+
     return ret;
 }
 
@@ -78,7 +83,6 @@ int kvm_init(void)
         WBVM_LOG_ERROR("Cloud not get KVM version: %d", res);
     }
 
-    WBVM_LOG_DEBUG("KVM API version: %d", res);
     if (res < MIN_KVM_VERSION) {
         WBVM_LOG_ERROR("Bad KVM version");
         return -ENOTSUP;
@@ -91,5 +95,15 @@ int kvm_init(void)
     }
 
     g_max_vcpus = res;
+
+    res = kvm_ioctl(KVM_CHECK_EXTENSION, KVM_CAP_NR_MEMSLOTS);
+    if (res < 0) {
+        WBVM_LOG_ERROR("Could not get NR_MEMSLOTS: %d", res);
+        return res;
+    }
+
+    g_max_memslots = res;
+
+    WBVM_LOG_DEBUG("KVM API version: %d, max vcpus: %d, max memslots: %d", res, g_max_vcpus, g_max_memslots);
     return 0;
 }
