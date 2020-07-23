@@ -1,6 +1,7 @@
 #include "wbvm/kvm.h"
 #include "wbvm/platform.h"
 
+#include <fcntl.h>
 #include <sys/ioctl.h>
 
 #define MIN_KVM_VERSION 12

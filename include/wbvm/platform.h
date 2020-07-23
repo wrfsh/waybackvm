@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
 #include <assert.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <sys/types.h>
 
@@ -25,7 +25,7 @@
 
 #define WBVM_DIE(fmt, ...) do { fprintf(stderr, fmt "\n", ##__VA_ARGS__); exit(EXIT_FAILURE); } while (0);
 
-static inline void* wbvm_malloc(size_t size)
+static inline void* wbvm_alloc(size_t size)
 {
     void* res = malloc(size);
     WBVM_VERIFY(res);
@@ -34,7 +34,7 @@ static inline void* wbvm_malloc(size_t size)
 
 static inline void* wbvm_zalloc(size_t size)
 {
-    void* res = wbvm_malloc(size);
+    void* res = wbvm_alloc(size);
     memset(res, 0, sizeof(*res));
     return res;
 }
