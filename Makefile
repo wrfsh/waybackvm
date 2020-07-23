@@ -8,16 +8,24 @@ LDFLAGS += -lpthread
 BINDIR := build-x86
 
 HDRS := $(wildcard include/*/*.h)
-SRCS := $(wildcard *.c)
-OBJS := $(patsubst %.c,$(BINDIR)/%.o,$(SRCS))
+SRCS := \
+	address_space.c \
+	kvm.c \
 
+ifeq ($(CONFIG_TEST),y)
+	SRCS += test_main.c
+	CFLAGS += -DCONFIG_TEST
+	LDFLAGS += -Wl,-Ttest.lds -lcunit
+else
+	SRCS += main.c
+endif
+
+OBJS := $(patsubst %.c,$(BINDIR)/%.o,$(SRCS))
 TARGET := $(BINDIR)/wbvm
 
-test: LDFLAGS += -Wl,-T test_sec.lds -lcunit
-test: CFLAGS += $(DEBUG_CFLAGS) -DTEST
 debug: CFLAGS += $(DEBUG_CFLAGS)
 release: CFLAGS += $(RELEASE_CFLAGS)
-debug release test: $(TARGET)
+debug release: $(TARGET)
 
 $(BINDIR):
 	mkdir -p $(BINDIR)
@@ -29,7 +37,7 @@ $(TARGET): $(BINDIR) $(HDRS) $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
 clean:
-	rm -rf $(OBJS) $(TARGET)
+	rm -rf $(BINDIR)
 
-.PHONY: debug release clean
-.DEFAULT_GOAL := release
+.PHONY: debug release test clean
+.DEFAULT_GOAL := debug

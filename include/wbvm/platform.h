@@ -10,6 +10,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 
+#if !defined(__GNUC__)
+#   error Unsupported toolchain
+#endif
+
 #ifdef _DEBUG
 #   define WBVM_LOG_DEBUG(fmt, ...) fprintf(stderr, "%s:%d: " fmt "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__);
 #   define WBVM_ASSERT(pred) assert(pred)
@@ -22,8 +26,9 @@
 #define WBVM_LOG_ERROR2(code, fmt, ...) fprintf(stderr, "%s:%d: " fmt ": %d\n", __FUNCTION__, __LINE__, ##__VA_ARGS__, (code));
 
 #define WBVM_VERIFY(pred) assert(pred)
-
 #define WBVM_DIE(fmt, ...) do { fprintf(stderr, fmt "\n", ##__VA_ARGS__); exit(EXIT_FAILURE); } while (0);
+
+#define WBVM_UNUSED     __attribute__((unused))
 
 static inline void* wbvm_alloc(size_t size)
 {
