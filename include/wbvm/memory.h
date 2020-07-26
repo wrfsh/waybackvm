@@ -16,6 +16,9 @@ struct memory_region
 
     /* Mapped size in bytes */
     size_t size;
+
+    /* Optional human-readable tag */
+    const char* tag;
 };
 
 /**
@@ -24,8 +27,9 @@ struct memory_region
  * \mr      Region to init
  * \memsize Size of anonymous memory in bytes
  * \prot    Mapping protection flags (PROT_READ, PROT_WRITE, PROT_EXEC)
+ * \tag     Optional human-readable tag for debugging
  */
-void init_host_memory_region(struct memory_region* mr, size_t memsize, int prot);
+void init_host_memory_region(struct memory_region* mr, size_t memsize, int prot, const char* tag);
 
 /**
  * Init file-backed memory region.
@@ -33,8 +37,9 @@ void init_host_memory_region(struct memory_region* mr, size_t memsize, int prot)
  * \mr      Region to init
  * \path    File path to map
  * \prot    Mapping protection flags (PROT_READ, PROT_WRITE, PROT_EXEC)
+ * \tag     Optional human-readable tag for debugging
  */
-void init_file_region(struct memory_region* mr, const char* path, int prot);
+void init_file_region(struct memory_region* mr, const char* path, int prot, const char* tag);
 
 /**
  * Unmap whatever was mapped for this region.

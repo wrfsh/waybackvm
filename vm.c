@@ -90,7 +90,8 @@ static void register_segment(struct address_range* r, gpa_t first, gpa_t last, v
     struct vm* vm = (struct vm*) ctx;
     struct memory_region* mr = r->mem;
     uintptr_t hva = (uintptr_t) mr->mem + r->mem_offset;
-    WBVM_LOG_DEBUG("Adding KVM memory slot: [%#x - %#x], mem region %p, hva %#lx", first, last, r->mem, hva);
+    WBVM_LOG_DEBUG("Adding KVM memory slot: [%#x - %#x], mem region \"%s\", hva %#lx",
+                   first, last, (mr->tag ? mr->tag : ""), hva);
 
     kvm_reg_memory_region(vm, vm->next_slot++, first, last, false, hva);
 }
@@ -173,7 +174,7 @@ static int init_system_memory(struct vm* vm, gsize_t memsize)
         return -1;
     }
 
-    init_host_memory_region(&vm->ram, memsize, PROT_READ|PROT_WRITE|PROT_EXEC);
+    init_host_memory_region(&vm->ram, memsize, PROT_READ|PROT_WRITE|PROT_EXEC, "system ram");
     map_memory_region(&vm->physical_address_space, &vm->ram, 0, 0);
 
     return 0;
@@ -206,7 +207,7 @@ static int load_firmware_image(struct vm* vm, const char* path)
      * The low-memory one can (and will) be unmapped by firmware later through fx440 registers.
      */
 
-    init_file_region(&vm->firmware, path, PROT_READ);
+    init_file_region(&vm->firmware, path, PROT_READ, "bios.bin");
     map_memory_region(&vm->physical_address_space, &vm->firmware, 0, 0xFFFFFFFF - image_size + 1);
 
     size_t low_size = WBVM_MIN(128ul << 10, image_size);

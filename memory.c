@@ -7,14 +7,15 @@
 #include "wbvm/kvm.h"
 #include "wbvm/vm.h"
 
-void init_host_memory_region(struct memory_region* mr, size_t memsize, int prot)
+void init_host_memory_region(struct memory_region* mr, size_t memsize, int prot, const char* tag)
 {
+    mr->tag = tag;
     mr->size = memsize;
     mr->mem = mmap(NULL, memsize, prot, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     WBVM_VERIFY(mr->mem != MAP_FAILED);
 }
 
-void init_file_region(struct memory_region* mr, const char* path, int prot)
+void init_file_region(struct memory_region* mr, const char* path, int prot, const char* tag)
 {
     int error = 0;
 
@@ -27,6 +28,7 @@ void init_file_region(struct memory_region* mr, const char* path, int prot)
     int fd = open(path, O_RDONLY);
     WBVM_VERIFY(fd >= 0);
 
+    mr->tag = tag;
     mr->mem = mmap(NULL, image_size, prot, MAP_PRIVATE, fd, 0);
     mr->size = image_size;
     close(fd);
