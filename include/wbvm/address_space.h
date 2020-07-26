@@ -6,6 +6,7 @@
 #include <sys/queue.h>
 
 #include "wbvm/platform.h"
+#include "wbvm/x86.h"
 
 /**
  * Address region in an interval inside address space.

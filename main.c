@@ -1,5 +1,6 @@
 #include "wbvm/platform.h"
 #include "wbvm/kvm.h"
+#include "wbvm/x86.h"
 
 #include <stdbool.h>
 #include <sys/mman.h>
@@ -7,60 +8,6 @@
 #include <pthread.h>
 
 #define VM_MEMSIZE (1ull << 27) /* 128MB */
-
-struct x86_segment
-{
-    uint32_t base;
-    uint16_t limit;
-    uint16_t selector;
-    uint8_t dpl;
-
-    enum {
-        X86_SEG_TYPE_RW  = (1 << 1),
-        X86_SEG_TYPE_ACCESSED = (1 << 0),
-    };
-    uint8_t type;
-
-    enum {
-        X86_SEG_S   = (1 << 0),
-        X86_SEG_P   = (1 << 1),
-        X86_SEG_AVL = (1 << 2),
-        X86_SEG_L   = (1 << 3),
-        X86_SEG_DB  = (1 << 4),
-        X86_SEG_G   = (1 << 5),
-    };
-    uint8_t flags;
-};
-
-struct x86_dtbl
-{
-    uint32_t base;
-    uint16_t limit;
-};
-
-struct x86_cpu_state
-{
-    uint32_t eax, ebx, ecx, edx;
-    uint32_t esi, edi, esp, ebp;
-
-    uint32_t eflags;
-    uint32_t eip;
-
-    struct x86_segment cs;
-    struct x86_segment ds;
-    struct x86_segment es;
-    struct x86_segment fs;
-    struct x86_segment gs;
-    struct x86_segment ss;
-    struct x86_segment tr;
-    struct x86_segment ldt;
-
-    struct x86_dtbl gdt, idt;
-
-    uint32_t cr0, cr2, cr3, cr4;
-    uint32_t efer;
-    uint32_t apic_base;
-};
 
 struct kvm_vcpu
 {
@@ -94,54 +41,6 @@ struct kvm_vm
         KVM_MEMSLOT_SYSTEM_MEMORY = 0, /** KVM memslot for physical system memory */
     };
 };
-
-/** Reset x86 segment to default state */
-static void reset_x86_segment(struct x86_segment* seg, uint8_t type)
-{
-    seg->base = 0;
-    seg->limit = 0xFFFF;
-    seg->selector = 0;
-    seg->type = type;
-    seg->dpl = 0;
-    seg->flags = X86_SEG_P;
-}
-
-/** Reset x86 descriptor table register to default state */
-static void reset_x86_dtbl(struct x86_dtbl* dtbl)
-{
-    dtbl->base = 0;
-    dtbl->limit = 0xFFFF;
-}
-
-/** Reset x86 boot processor */
-static void reset_x86_bsp(struct kvm_vcpu* vcpu)
-{
-    struct x86_cpu_state* x86_cpu = &vcpu->x86_cpu;
-
-    memset(x86_cpu, 0, sizeof(*x86_cpu));
-
-    x86_cpu->edx = 0x600;
-    x86_cpu->eflags = 0x2;
-    x86_cpu->eip = 0x0000FFF0;
-
-    reset_x86_segment(&x86_cpu->cs, 0x3);
-    x86_cpu->cs.base = 0xFFFF0000;
-    x86_cpu->cs.selector = 0xF000;
-
-    reset_x86_segment(&x86_cpu->ds, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->ss, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->es, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->fs, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->gs, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->tr, X86_SEG_TYPE_RW);
-    reset_x86_segment(&x86_cpu->ldt, X86_SEG_TYPE_RW);
-
-    reset_x86_dtbl(&x86_cpu->gdt);
-    reset_x86_dtbl(&x86_cpu->idt);
-
-    x86_cpu->cr0 = 0x60000010;
-    x86_cpu->apic_base = 0xFEE00000 | (1ul << 11); /* Default address + enable bit */
-}
 
 /** Set x86 general purpose registers for KVM */
 static void kvm_set_regs(const struct kvm_vcpu* vcpu)
@@ -250,7 +149,7 @@ static int init_vcpu(struct kvm_vm* vm, struct kvm_vcpu* vcpu, uint32_t id)
     vcpu->kvm_run = (struct kvm_run*) mmap_ptr;
     vcpu->vm = vm;
 
-    reset_x86_bsp(vcpu);
+    reset_x86_bsp(&vcpu->x86_cpu);
 
     kvm_set_regs(vcpu);
     kvm_set_sregs(vcpu);

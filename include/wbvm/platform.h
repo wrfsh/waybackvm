@@ -33,11 +33,6 @@
 #define WBVM_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define WBVM_MAX(a, b) ((a) > (b) ? (a) : (b))
 
-/* Target is 32-bit x86 */
-typedef uint32_t gpa_t;     /* Guest physical address */
-typedef uint32_t gva_t;     /* Guest virtual address */
-typedef uint32_t gsize_t;   /* Guest size_t */
-
 static inline void* wbvm_alloc(size_t size)
 {
     void* res = malloc(size);
