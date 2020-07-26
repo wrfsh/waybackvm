@@ -11,6 +11,7 @@ HDRS := $(wildcard include/*/*.h)
 SRCS := \
 	address_space.c \
 	kvm.c \
+	vm.c \
 	x86.c \
 
 ifeq ($(CONFIG_TEST),y)
