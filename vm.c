@@ -190,6 +190,24 @@ void commit_address_space(struct vm* vm)
     address_space_walk_segments(&vm->physical_address_space, register_segment, vm);
 }
 
+static int vcpu_handle_exit(struct vcpu* vcpu)
+{
+    volatile struct kvm_run* kvm_run = vcpu->kvm_run;
+
+    switch (kvm_run->exit_reason) {
+    case KVM_EXIT_FAIL_ENTRY:
+        WBVM_LOG_ERROR("VCPU %d failed entry, hw error: %#llx",
+                       vcpu->id, kvm_run->fail_entry.hardware_entry_failure_reason);
+        return -1;
+
+    default:
+        WBVM_LOG_ERROR("Unknown exit reason %d", kvm_run->exit_reason);
+        return -1;
+    };
+
+    return 0;
+}
+
 static void* vcpu_thread(void* arg)
 {
     int res = 0;
@@ -203,13 +221,16 @@ static void* vcpu_thread(void* arg)
         res = kvm_vcpu_ioctl(vcpu->vcpufd, KVM_RUN, 0);
         if (res != 0) {
             WBVM_LOG_ERROR2(res, "KVM_RUN failed");
-
-            /* TODO: parking? */
             break;
         }
 
         WBVM_LOG_DEBUG("vcpu %d exited, reason 0x%x", vcpu->id, vcpu->kvm_run->exit_reason);
 
+        res = vcpu_handle_exit(vcpu);
+        if (res != 0) {
+            should_exit = true;
+            dump_vcpu_state(vcpu);
+        }
     } while (!should_exit);
 
     return NULL;
