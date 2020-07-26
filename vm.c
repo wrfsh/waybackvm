@@ -26,6 +26,25 @@ static void kvm_set_regs(const struct vcpu* vcpu)
     kvm_vcpu_ioctl_nofail(vcpu->vcpufd, KVM_SET_REGS, (uintptr_t)&kvmregs);
 }
 
+/** Get x86 general purpose registers from KVM */
+static void kvm_get_regs(struct vcpu* vcpu)
+{
+    struct kvm_regs kvmregs;
+    kvm_vcpu_ioctl_nofail(vcpu->vcpufd, KVM_GET_REGS, (uintptr_t)&kvmregs);
+
+    struct x86_cpu_state* x86_cpu = &vcpu->x86_cpu;
+    x86_cpu->eax = kvmregs.rax;
+    x86_cpu->ebx = kvmregs.rbx;
+    x86_cpu->ecx = kvmregs.rcx;
+    x86_cpu->edx = kvmregs.rdx;
+    x86_cpu->esi = kvmregs.rsi;
+    x86_cpu->edi = kvmregs.rdi;
+    x86_cpu->esp = kvmregs.rsp;
+    x86_cpu->ebp = kvmregs.rbp;
+    x86_cpu->eip = kvmregs.rip;
+    x86_cpu->eflags = kvmregs.rflags;
+}
+
 /** Set x86 segment descriptor values for KVM */
 static void kvm_set_seg(struct kvm_segment* kvmseg, const struct x86_segment* seg)
 {
@@ -41,6 +60,22 @@ static void kvm_set_seg(struct kvm_segment* kvmseg, const struct x86_segment* se
     kvmseg->g = !!(seg->flags & X86_SEG_G);
     kvmseg->avl = !!(seg->flags & X86_SEG_AVL);
     kvmseg->unusable = !kvmseg->present;
+}
+
+/** Get x86 segment descriptor values from KVM */
+static void kvm_get_seg(const struct kvm_segment* kvmseg, struct x86_segment* seg)
+{
+    seg->base = kvmseg->base;
+    seg->limit = kvmseg->limit;
+    seg->selector = kvmseg->selector;
+    seg->type = kvmseg->type;
+    seg->dpl = kvmseg->dpl;
+    seg->flags |= (kvmseg->present ? X86_SEG_P : 0);
+    seg->flags |= (kvmseg->db ? X86_SEG_DB : 0);
+    seg->flags |= (kvmseg->s ? X86_SEG_S : 0);
+    seg->flags |= (kvmseg->l ? X86_SEG_L : 0);
+    seg->flags |= (kvmseg->g ? X86_SEG_G : 0);
+    seg->flags |= (kvmseg->avl ? X86_SEG_AVL : 0);
 }
 
 /** Set x86 system registers for KVM */
@@ -66,6 +101,53 @@ static void kvm_set_sregs(const struct vcpu* vcpu)
     kvm_sregs.efer = x86_cpu->efer;
 
     kvm_vcpu_ioctl_nofail(vcpu->vcpufd, KVM_SET_SREGS, (uintptr_t)&kvm_sregs);
+}
+
+/** Get x86 system registers from KVM */
+static void kvm_get_sregs(struct vcpu* vcpu)
+{
+    struct kvm_sregs kvm_sregs = {0};
+    kvm_vcpu_ioctl_nofail(vcpu->vcpufd, KVM_GET_SREGS, (uintptr_t)&kvm_sregs);
+
+    struct x86_cpu_state* x86_cpu = &vcpu->x86_cpu;
+    x86_cpu->cr0 = kvm_sregs.cr0;
+    x86_cpu->cr2 = kvm_sregs.cr2;
+    x86_cpu->cr3 = kvm_sregs.cr3;
+    x86_cpu->cr4 = kvm_sregs.cr4;
+
+    x86_cpu->efer = kvm_sregs.efer;
+
+    kvm_get_seg(&kvm_sregs.cs, &x86_cpu->cs);
+    kvm_get_seg(&kvm_sregs.ds, &x86_cpu->ds);
+    kvm_get_seg(&kvm_sregs.es, &x86_cpu->es);
+    kvm_get_seg(&kvm_sregs.fs, &x86_cpu->fs);
+    kvm_get_seg(&kvm_sregs.gs, &x86_cpu->gs);
+    kvm_get_seg(&kvm_sregs.ss, &x86_cpu->ss);
+    kvm_get_seg(&kvm_sregs.tr, &x86_cpu->tr);
+    kvm_get_seg(&kvm_sregs.ldt, &x86_cpu->ldt);
+}
+
+static void dump_vcpu_state(struct vcpu* vcpu)
+{
+    kvm_get_regs(vcpu);
+    kvm_get_sregs(vcpu);
+
+    const struct x86_cpu_state* x86_cpu = &vcpu->x86_cpu;
+
+    WBVM_LOG_DEBUG("VCPU %d guest state:", vcpu->id);
+    WBVM_LOG_DEBUG("EAX = %08x, EBX = %08x, ECX = %08x, EDX = %08x",
+                   x86_cpu->eax, x86_cpu->ebx, x86_cpu->ecx, x86_cpu->edx);
+    WBVM_LOG_DEBUG("ESI = %08x, EDI = %08x, EBP = %08x, ESP = %08x",
+                   x86_cpu->esi, x86_cpu->edi, x86_cpu->ebp, x86_cpu->esp);
+    WBVM_LOG_DEBUG("EIP = %08x",
+                   x86_cpu->eip);
+    WBVM_LOG_DEBUG("EFLAGS = %08x",
+                   x86_cpu->eflags);
+    WBVM_LOG_DEBUG("CR0 = %08x, CR2 = %08x, CR3 = %08x, CR4 = %08x, EFER = %08x",
+                   x86_cpu->cr0, x86_cpu->cr2, x86_cpu->cr3, x86_cpu->cr4, x86_cpu->efer);
+    WBVM_LOG_DEBUG("CS = %04hx, DS = %04hx, ES = %04hx, SS = %04hx, FS = %04hx, GS = %04hx",
+                   x86_cpu->cs.selector, x86_cpu->ds.selector, x86_cpu->es.selector,
+                   x86_cpu->ss.selector, x86_cpu->fs.selector, x86_cpu->gs.selector);
 }
 
 static void kvm_reg_memory_region(struct vm* vm, int slot, gpa_t first, gpa_t last, bool readonly, uintptr_t hva)
