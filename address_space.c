@@ -3,7 +3,7 @@
 
 #include <wbvm/address_space.h>
 
-void address_range_init(struct address_range* r, gpa_t first, gpa_t last)
+void address_range_init(struct address_range* r, gpa_t first, gpa_t last, struct address_space* as)
 {
     WBVM_VERIFY(r);
     WBVM_VERIFY(last >= first);
@@ -12,6 +12,7 @@ void address_range_init(struct address_range* r, gpa_t first, gpa_t last)
     r->last = last;
     r->mem = NULL;
     r->mem_offset = 0;
+    r->as = as;
     LIST_INIT(&r->subranges);
 }
 
@@ -57,6 +58,9 @@ void address_range_add_subrange(struct address_range* r, struct address_range* s
     } else {
         LIST_INSERT_AFTER(prev, subr, link);
     }
+
+    /* Mark our address space dirty since there is new subrange */
+    r->as->is_dirty = true;
 }
 
 struct address_range* address_range_lookup(struct address_range* r, gpa_t addr)
@@ -117,7 +121,8 @@ void address_space_init(struct address_space* as, gpa_t first, gpa_t last)
 {
     WBVM_VERIFY(as);
 
-    address_range_init(&as->root, first, last);
+    address_range_init(&as->root, first, last, as);
+    as->is_dirty = false;
 }
 
 struct address_range* address_space_lookup_region(struct address_space* as, gpa_t addr)
@@ -135,7 +140,7 @@ struct address_range* address_space_map_range(struct address_space* as, gpa_t fi
     WBVM_VERIFY(base_ar);
 
     struct address_range* ar = wbvm_alloc(sizeof(*ar));
-    address_range_init(ar, first, last);
+    address_range_init(ar, first, last, as);
     address_range_add_subrange(base_ar, ar);
 
     return ar;
@@ -156,7 +161,7 @@ void address_space_walk_segments(struct address_space* as, address_range_segment
 static struct address_range make_address_range(gpa_t first, gpa_t last)
 {
     struct address_range r;
-    address_range_init(&r, first, last);
+    address_range_init(&r, first, last, NULL);
     return r;
 }
 
@@ -343,4 +348,14 @@ WBVM_TEST(gpa_overflow_test)
     size_t segments_seen = 0;
     address_space_walk_segments(&as, gpa_overflow_walk, &segments_seen);
     CU_ASSERT_EQUAL(segments_seen, 3);
+}
+
+WBVM_TEST(address_space_dirty_test)
+{
+    struct address_space as;
+    address_space_init(&as, 0, 0xFFFFFFFF);
+    CU_ASSERT_FALSE(as.is_dirty);
+
+    address_space_map_range(&as, 0, 0x00FFFFFF);
+    CU_ASSERT_TRUE(as.is_dirty);
 }

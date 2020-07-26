@@ -31,9 +31,12 @@ struct address_range
 
     /* Host virtual address offset within mapped memory region */
     uint64_t mem_offset;
+
+    /* Our address space */
+    struct address_space* as;
 };
 
-void address_range_init(struct address_range* r, gpa_t first, gpa_t last);
+void address_range_init(struct address_range* r, gpa_t first, gpa_t last, struct address_space* as);
 
 /** Address range contains a gpa? */
 bool address_range_contains_addr(const struct address_range* r, gpa_t addr);
@@ -85,6 +88,9 @@ struct address_space
 {
     /* Dummy unmapped root range that covers an entire address space */
     struct address_range root;
+
+    /* Address space has changed */
+    bool is_dirty;
 };
 
 void address_space_init(struct address_space* as, gpa_t first, gpa_t last);
