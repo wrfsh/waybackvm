@@ -1,6 +1,7 @@
 #pragma once
 
 #include "wbvm/x86.h"
+#include "wbvm/memory.h"
 
 struct vcpu
 {
@@ -20,16 +21,17 @@ struct vm
     /* x86 BSP vcpu */
     struct vcpu vcpu;
 
-    /* Physical memory region mapping */
-    void* physical_memory;
-    uint64_t memsize;
+    /* Guest physical address space */
+    struct address_space physical_address_space;
+
+    /* System RAM memory region mapped to guest physical address space */
+    struct memory_region ram;
 
     /* KVM VM fd */
     int vmfd;
 
-    enum {
-        KVM_MEMSLOT_SYSTEM_MEMORY = 0, /** KVM memslot for physical system memory */
-    };
+    /* Next free KVM memory slot */
+    int next_slot;
 };
 
-int init_vm(struct vm* vm, uint64_t memsize);
+int init_vm(struct vm* vm, gsize_t memsize);

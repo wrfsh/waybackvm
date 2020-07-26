@@ -2,7 +2,7 @@
 #include "wbvm/kvm.h"
 #include "wbvm/vm.h"
 
-#define VM_MEMSIZE (1ull << 27) /* 128MB */
+#define VM_MEMSIZE ((gsize_t)1 << 27) /* 128MB */
 
 static struct vm vm;
 

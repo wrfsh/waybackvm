@@ -67,6 +67,45 @@ static void kvm_set_sregs(const struct vcpu* vcpu)
     kvm_vcpu_ioctl_nofail(vcpu->vcpufd, KVM_SET_SREGS, (uintptr_t)&kvm_sregs);
 }
 
+static void kvm_reg_memory_region(struct vm* vm, int slot, gpa_t first, gpa_t last, bool readonly, uintptr_t hva)
+{
+    struct kvm_userspace_memory_region memregion;
+    memregion.slot = slot;
+    memregion.flags = readonly ? KVM_MEM_READONLY : 0;
+    memregion.guest_phys_addr = first;
+    memregion.memory_size = (uint64_t)last - first + 1;
+    memregion.userspace_addr = hva;
+
+    kvm_vm_ioctl_nofail(vm->vmfd, KVM_SET_USER_MEMORY_REGION, (uintptr_t) &memregion);
+}
+
+static void register_segment(struct address_range* r, gpa_t first, gpa_t last, void* ctx)
+{
+    if (!r->mem) {
+        /* Skip unmapped segment */
+        return;
+    }
+
+    struct vm* vm = (struct vm*) ctx;
+    struct memory_region* mr = r->mem;
+    uintptr_t hva = (uintptr_t) mr->mem + r->mem_offset;
+    WBVM_LOG_DEBUG("Adding KVM memory slot: [%#x - %#x], mem region %p, hva %#lx", first, last, r->mem, hva);
+
+    kvm_reg_memory_region(vm, vm->next_slot++, first, last, false, hva);
+}
+
+/**
+ * Commit any changes done to VM physical address space to hypervisor.
+ */
+void commit_address_space(struct vm* vm)
+{
+    if (!vm->physical_address_space.is_dirty) {
+        return;
+    }
+
+    address_space_walk_segments(&vm->physical_address_space, register_segment, vm);
+}
+
 static void* vcpu_thread(void* arg)
 {
     int res = 0;
@@ -126,26 +165,20 @@ static int init_vcpu(struct vm* vm, struct vcpu* vcpu, uint32_t id)
     return 0;
 }
 
-static int init_memory(struct vm* vm, uint64_t memsize)
+static int init_system_memory(struct vm* vm, gsize_t memsize)
 {
-    vm->physical_memory = mmap(NULL, memsize, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-    if (vm->physical_memory == MAP_FAILED) {
-        WBVM_LOG_ERROR2(-errno, "physical memory mmap failed");
+    /* Supported memory size >= 1MB && <= 3GB */
+    if (memsize < (1ull << 20) || memsize > (3ull << 30)) {
         return -1;
     }
 
-    struct kvm_userspace_memory_region memregion;
-    memregion.slot = KVM_MEMSLOT_SYSTEM_MEMORY;
-    memregion.flags = 0;
-    memregion.guest_phys_addr = 0;
-    memregion.memory_size = memsize;
-    memregion.userspace_addr = (uintptr_t)vm->physical_memory;
+    init_host_memory_region(&vm->ram, memsize, PROT_READ|PROT_WRITE|PROT_EXEC);
+    map_memory_region(&vm->physical_address_space, &vm->ram, 0, 0);
 
-    kvm_vm_ioctl_nofail(vm->vmfd, KVM_SET_USER_MEMORY_REGION, (uintptr_t)&memregion);
     return 0;
 }
 
-int init_vm(struct vm* vm, uint64_t memsize)
+int init_vm(struct vm* vm, gsize_t memsize)
 {
     int res = 0;
 
@@ -157,10 +190,15 @@ int init_vm(struct vm* vm, uint64_t memsize)
         return res;
     }
 
-    res = init_memory(vm, memsize);
+    address_space_init(&vm->physical_address_space, 0, UINT32_MAX);
+
+    res = init_system_memory(vm, memsize);
     if (res != 0) {
+        WBVM_LOG_ERROR2(res, "failed to init system memory");
         return res;
     }
+
+    commit_address_space(vm);
 
     res = init_vcpu(vm, &vm->vcpu, 0);
     if (res != 0) {

@@ -11,6 +11,7 @@ HDRS := $(wildcard include/*/*.h)
 SRCS := \
 	address_space.c \
 	kvm.c \
+	memory.c \
 	vm.c \
 	x86.c \
 
