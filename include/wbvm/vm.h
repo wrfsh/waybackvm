@@ -12,7 +12,7 @@ struct vcpu
     pthread_t tid;
 
     /* KVM-specific state */
-    struct kvm_run* kvm_run;
+    volatile struct kvm_run* kvm_run;
     int vcpufd;
 };
 
