@@ -27,6 +27,9 @@ struct vm
     /* System RAM memory region mapped to guest physical address space */
     struct memory_region ram;
 
+    /* Mapped firmware image */
+    struct memory_region firmware;
+
     /* KVM VM fd */
     int vmfd;
 
@@ -34,4 +37,4 @@ struct vm
     int next_slot;
 };
 
-int init_vm(struct vm* vm, gsize_t memsize);
+int init_vm(struct vm* vm, gsize_t memsize, const char* fwpath);

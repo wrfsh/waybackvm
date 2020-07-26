@@ -3,6 +3,7 @@
 #include "wbvm/vm.h"
 
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <pthread.h>
 
 /** Set x86 general purpose registers for KVM */
@@ -178,7 +179,44 @@ static int init_system_memory(struct vm* vm, gsize_t memsize)
     return 0;
 }
 
-int init_vm(struct vm* vm, gsize_t memsize)
+/** Read and map bios firmware image on expected addresses */
+static int load_firmware_image(struct vm* vm, const char* path)
+{
+    int error = 0;
+
+    struct stat st;
+    error = stat(path, &st);
+    if (error) {
+        return error;
+    }
+
+    size_t image_size = st.st_size;
+    if (!image_size || image_size > 256 * 1024 || image_size & 0xFFFF) {
+        return -1;
+    }
+
+    WBVM_LOG_DEBUG("loading firmware image %s, size %zu", path, image_size);
+
+    /*
+     * PCAT firmware is mapped twice:
+     * - Full image at end of 32-bit physical address space.
+     * - At most 2 high 64KB segments are remapped at low 1MB memory, at E and F segments.
+     *
+     * Both regions are mapped read only.
+     * The low-memory one can (and will) be unmapped by firmware later through fx440 registers.
+     */
+
+    init_file_region(&vm->firmware, path, PROT_READ);
+    map_memory_region(&vm->physical_address_space, &vm->firmware, 0, 0xFFFFFFFF - image_size + 1);
+
+    size_t low_size = WBVM_MIN(128ul << 10, image_size);
+    size_t low_offset = (image_size > low_size ? image_size - low_size : 0);
+    map_memory_region(&vm->physical_address_space, &vm->firmware, low_offset, 0xFFFFF - low_size + 1);
+
+    return 0;
+}
+
+int init_vm(struct vm* vm, gsize_t memsize, const char* fwpath)
 {
     int res = 0;
 
@@ -195,6 +233,12 @@ int init_vm(struct vm* vm, gsize_t memsize)
     res = init_system_memory(vm, memsize);
     if (res != 0) {
         WBVM_LOG_ERROR2(res, "failed to init system memory");
+        return res;
+    }
+
+    res = load_firmware_image(vm, fwpath);
+    if (res != 0) {
+        WBVM_LOG_ERROR2(res, "failed to load firmware image");
         return res;
     }
 
