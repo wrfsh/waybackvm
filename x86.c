@@ -1,14 +1,18 @@
 #include "wbvm/platform.h"
 #include "wbvm/x86.h"
 
-void reset_x86_segment(struct x86_segment* seg, uint8_t type)
+void reset_x86_segment(struct x86_segment* seg,
+                       uint32_t base,
+                       uint16_t selector,
+                       uint8_t type,
+                       uint8_t flags)
 {
-    seg->base = 0;
+    seg->base = base;
     seg->limit = 0xFFFF;
-    seg->selector = 0;
+    seg->selector = selector;
     seg->type = type;
     seg->dpl = 0;
-    seg->flags = X86_SEG_P;
+    seg->flags = flags;
 }
 
 void reset_x86_dtbl(struct x86_dtbl* dtbl)
@@ -25,17 +29,14 @@ void reset_x86_bsp(struct x86_cpu_state* x86_cpu)
     x86_cpu->eflags = 0x2;
     x86_cpu->eip = 0x0000FFF0;
 
-    reset_x86_segment(&x86_cpu->cs, 0x3);
-    x86_cpu->cs.base = 0xFFFF0000;
-    x86_cpu->cs.selector = 0xF000;
-
-    reset_x86_segment(&x86_cpu->ds, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->ss, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->es, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->fs, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->gs, X86_SEG_TYPE_RW | X86_SEG_TYPE_ACCESSED);
-    reset_x86_segment(&x86_cpu->tr, X86_SEG_TYPE_RW);
-    reset_x86_segment(&x86_cpu->ldt, X86_SEG_TYPE_RW);
+    reset_x86_segment(&x86_cpu->cs, 0xffff0000, 0xf000, X86_SEG_TYPE_CS | X86_SEG_TYPE_ACC, X86_SEG_P | X86_SEG_S);
+    reset_x86_segment(&x86_cpu->ds, 0, 0, X86_SEG_TYPE_DS | X86_SEG_TYPE_ACC, X86_SEG_P | X86_SEG_S);
+    reset_x86_segment(&x86_cpu->ss, 0, 0, X86_SEG_TYPE_DS | X86_SEG_TYPE_ACC, X86_SEG_P | X86_SEG_S);
+    reset_x86_segment(&x86_cpu->es, 0, 0, X86_SEG_TYPE_DS | X86_SEG_TYPE_ACC, X86_SEG_P | X86_SEG_S);
+    reset_x86_segment(&x86_cpu->fs, 0, 0, X86_SEG_TYPE_DS | X86_SEG_TYPE_ACC, X86_SEG_P | X86_SEG_S);
+    reset_x86_segment(&x86_cpu->gs, 0, 0, X86_SEG_TYPE_DS | X86_SEG_TYPE_ACC, X86_SEG_P | X86_SEG_S);
+    reset_x86_segment(&x86_cpu->tr, 0, 0, X86_SEG_TYPE_TSS, X86_SEG_P);
+    reset_x86_segment(&x86_cpu->ldt, 0, 0, X86_SEG_TYPE_LDT, X86_SEG_P);
 
     reset_x86_dtbl(&x86_cpu->gdt);
     reset_x86_dtbl(&x86_cpu->idt);

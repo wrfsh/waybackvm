@@ -78,6 +78,13 @@ static void kvm_get_seg(const struct kvm_segment* kvmseg, struct x86_segment* se
     seg->flags |= (kvmseg->avl ? X86_SEG_AVL : 0);
 }
 
+static void kvm_set_dtable(struct kvm_dtable* kvm_dtable, const struct x86_dtbl* dtable)
+{
+    kvm_dtable->base = dtable->base;
+    kvm_dtable->limit = dtable->limit;
+    memset(kvm_dtable->padding, 0, sizeof(kvm_dtable->padding));
+}
+
 /** Set x86 system registers for KVM */
 static void kvm_set_sregs(const struct vcpu* vcpu)
 {
@@ -93,12 +100,16 @@ static void kvm_set_sregs(const struct vcpu* vcpu)
     kvm_set_seg(&kvm_sregs.tr, &x86_cpu->tr);
     kvm_set_seg(&kvm_sregs.ldt, &x86_cpu->ldt);
 
+    kvm_set_dtable(&kvm_sregs.gdt, &x86_cpu->gdt);
+    kvm_set_dtable(&kvm_sregs.idt, &x86_cpu->idt);
+
     kvm_sregs.cr0 = x86_cpu->cr0;
     kvm_sregs.cr2 = x86_cpu->cr2;
     kvm_sregs.cr3 = x86_cpu->cr3;
     kvm_sregs.cr4 = x86_cpu->cr4;
 
     kvm_sregs.efer = x86_cpu->efer;
+    kvm_sregs.apic_base = x86_cpu->apic_base;
 
     kvm_vcpu_ioctl_nofail(vcpu->vcpufd, KVM_SET_SREGS, (uintptr_t)&kvm_sregs);
 }

@@ -21,8 +21,11 @@ struct x86_segment
     uint8_t dpl;
 
     enum {
-        X86_SEG_TYPE_RW  = (1 << 1),
-        X86_SEG_TYPE_ACCESSED = (1 << 0),
+        X86_SEG_TYPE_DS  = 0b0010,   /* Read/Write */
+        X86_SEG_TYPE_CS  = 0b1010,   /* Execute/Read */
+        X86_SEG_TYPE_TSS = 0b0011,   /* 16-bit TSS */
+        X86_SEG_TYPE_LDT = 0b0010,   /* LDT */
+        X86_SEG_TYPE_ACC = (1 << 0), /* Accessed flag */
     };
     uint8_t type;
 
@@ -76,7 +79,11 @@ struct x86_cpu_state
 /**
  * Reset x86 segment to default state
  */
-void reset_x86_segment(struct x86_segment* seg, uint8_t type);
+void reset_x86_segment(struct x86_segment* seg,
+                       uint32_t base,
+                       uint16_t selector,
+                       uint8_t type,
+                       uint8_t flags);
 
 /**
  * Reset x86 descriptor table register to default state
