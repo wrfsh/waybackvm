@@ -54,6 +54,13 @@ static inline void* wbvm_calloc(size_t nmemb, size_t size)
     return res;
 }
 
+static inline void* wbvm_realloc(void* ptr, size_t new_size)
+{
+    void* res = realloc(ptr, new_size);
+    WBVM_VERIFY(res);
+    return res;
+}
+
 static inline void wbvm_free(void* p)
 {
     if (p) {

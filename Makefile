@@ -12,6 +12,7 @@ SRCS := \
 	address_space.c \
 	kvm.c \
 	memory.c \
+	pio.c \
 	vm.c \
 	x86.c \
 
