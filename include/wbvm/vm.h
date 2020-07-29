@@ -3,6 +3,8 @@
 #include "wbvm/x86.h"
 #include "wbvm/memory.h"
 
+struct vdev;
+
 struct vcpu
 {
     struct x86_cpu_state x86_cpu;
@@ -35,6 +37,9 @@ struct vm
 
     /* Next free KVM memory slot */
     int next_slot;
+
+    /* Emulated device list */
+    LIST_HEAD(, vdev) devices;
 };
 
 int init_vm(struct vm* vm, gsize_t memsize, const char* fwpath);

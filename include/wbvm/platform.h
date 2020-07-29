@@ -29,9 +29,16 @@
 #define WBVM_DIE(fmt, ...) do { fprintf(stderr, fmt "\n", ##__VA_ARGS__); exit(EXIT_FAILURE); } while (0);
 
 #define WBVM_UNUSED     __attribute__((unused))
+#define WBVM_CTOR       __attribute__((constructor))
 
 #define WBVM_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define WBVM_MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define offset_of(type, member)  __builtin_offsetof (type, member)
+
+#define container_of(ptr, type, member) ({                      \
+        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+        (type *)( (char *)__mptr - offset_of(type, member) );})
 
 static inline void* wbvm_alloc(size_t size)
 {

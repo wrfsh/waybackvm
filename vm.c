@@ -2,6 +2,7 @@
 #include "wbvm/kvm.h"
 #include "wbvm/vm.h"
 #include "wbvm/pio.h"
+#include "wbvm/dev.h"
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -408,6 +409,30 @@ static int load_firmware_image(struct vm* vm, const char* path)
     return 0;
 }
 
+static int init_devices(struct vm* vm)
+{
+    static const struct {
+        const char* name;
+        int argc;
+        const char* argv[16];
+    } device_list[] = {
+    };
+
+    LIST_INIT(&vm->devices);
+
+    for (size_t i = 0; i < sizeof(device_list) / sizeof(*device_list); ++i) {
+        struct vdev* vdev = create_device(device_list[i].name, device_list[i].argc, device_list[i].argv);
+        if (!vdev) {
+            WBVM_LOG_ERROR("Failed to init device %s", device_list[i].name);
+            return -1;
+        }
+
+        LIST_INSERT_HEAD(&vm->devices, vdev, link);
+    }
+
+    return 0;
+}
+
 int init_vm(struct vm* vm, gsize_t memsize, const char* fwpath)
 {
     int res = 0;
@@ -435,6 +460,12 @@ int init_vm(struct vm* vm, gsize_t memsize, const char* fwpath)
     }
 
     commit_address_space(vm);
+
+    res = init_devices(vm);
+    if (res != 0) {
+        WBVM_LOG_ERROR2(res, "failed to init devices");
+        return res;
+    }
 
     res = init_vcpu(vm, &vm->vcpu, 0);
     if (res != 0) {

@@ -10,6 +10,7 @@ BINDIR := build-x86
 HDRS := $(wildcard include/*/*.h)
 SRCS := \
 	address_space.c \
+	dev.c \
 	kvm.c \
 	memory.c \
 	pio.c \
