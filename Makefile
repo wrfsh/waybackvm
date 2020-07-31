@@ -3,7 +3,7 @@ MAKE := make
 CFLAGS := -Wall -Werror -std=gnu11 -Iinclude -D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE $(CFLAGS)
 DEBUG_CFLAGS := -D_DEBUG -ggdb3 -O0
 RELEASE_CFLAGS := -DNDEBUG -O2
-LDFLAGS += -lpthread
+LDFLAGS += -lpthread -lcapstone
 
 BINDIR := build-x86
 
