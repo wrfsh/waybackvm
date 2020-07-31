@@ -125,7 +125,7 @@ void address_space_init(struct address_space* as, gpa_t first, gpa_t last)
     as->is_dirty = false;
 }
 
-struct address_range* address_space_lookup_region(struct address_space* as, gpa_t addr)
+struct address_range* address_space_lookup_range(struct address_space* as, gpa_t addr)
 {
     WBVM_VERIFY(as);
     return address_range_lookup(&as->root, addr);
@@ -136,7 +136,7 @@ struct address_range* address_space_map_range(struct address_space* as, gpa_t fi
     WBVM_VERIFY(as);
 
     /* Find the region that currently maps requested range and map on top of it */
-    struct address_range* base_ar = address_space_lookup_region(as, first);
+    struct address_range* base_ar = address_space_lookup_range(as, first);
     WBVM_VERIFY(base_ar);
 
     struct address_range* ar = wbvm_alloc(sizeof(*ar));
@@ -269,22 +269,22 @@ WBVM_TEST(nested_regions_test)
      * Valid lookups
      */
 
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 1), &as.root);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 2), subranges[2]);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 3), subranges[3]);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 4), subranges[0]);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 5), subranges[4]);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 6), &as.root);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 7), subranges[1]);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 8), subranges[1]);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 9), &as.root);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 1), &as.root);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 2), subranges[2]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 3), subranges[3]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 4), subranges[0]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 5), subranges[4]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 6), &as.root);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 7), subranges[1]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 8), subranges[1]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 9), &as.root);
 
     /*
      * OOB lookups
      */
 
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, as.root.first - 1), NULL);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, as.root.last + 1), NULL);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, as.root.first - 1), NULL);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, as.root.last + 1), NULL);
 
     /*
      * Walk the segments and mark ranges we've seen for all our addresses
@@ -336,10 +336,10 @@ WBVM_TEST(gpa_overflow_test)
      * Lookup borders
      */
 
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 0), subranges[0]);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 0x00FFFFFF), subranges[0]);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 0x02000000), subranges[1]);
-    CU_ASSERT_EQUAL(address_space_lookup_region(&as, 0xFFFFFFFF), subranges[1]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 0), subranges[0]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 0x00FFFFFF), subranges[0]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 0x02000000), subranges[1]);
+    CU_ASSERT_EQUAL(address_space_lookup_range(&as, 0xFFFFFFFF), subranges[1]);
 
     /*
      * Walk segments

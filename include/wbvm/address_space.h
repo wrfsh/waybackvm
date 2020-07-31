@@ -99,7 +99,7 @@ void address_space_init(struct address_space* as, gpa_t first, gpa_t last);
  * Find address range that contains an address.
  * Will the bottom-most leaf subrange.
  */
-struct address_range* address_space_lookup_region(struct address_space* as, gpa_t addr);
+struct address_range* address_space_lookup_range(struct address_space* as, gpa_t addr);
 
 /**
  * Map a new address range.
