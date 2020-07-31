@@ -1,6 +1,7 @@
 #include "wbvm/platform.h"
 #include "wbvm/kvm.h"
 #include "wbvm/vm.h"
+#include "wbvm/pio.h"
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -243,11 +244,45 @@ void commit_address_space(struct vm* vm)
     address_space_walk_segments(&vm->physical_address_space, register_segment, vm);
 }
 
+static int handle_io_exit(struct vcpu* vcpu)
+{
+    volatile struct kvm_run* kvm_run = vcpu->kvm_run;
+
+    WBVM_LOG_DEBUG("KVM_EXIT_IO: dir = %d, size = %d, port = 0x%hx, count = %d, offset = %llx",
+            kvm_run->io.direction,
+            kvm_run->io.size,
+            kvm_run->io.port,
+            kvm_run->io.count,
+            kvm_run->io.data_offset);
+
+    void* pdata = (void*)kvm_run + kvm_run->io.data_offset;
+
+    for (uint32_t i = 0; i < kvm_run->io.count; ++i) {
+        int res = 0;
+
+        if (kvm_run->io.direction == KVM_EXIT_IO_IN) {
+            res = resolve_pio_read(kvm_run->io.port, kvm_run->io.size, (uint32_t*) pdata);
+        } else {
+            res = resolve_pio_write(kvm_run->io.port, kvm_run->io.size, *(uint32_t*) pdata);
+        }
+
+        if (res < 0) {
+            WBVM_LOG_ERROR("Could not resolve PIO address 0x%hx", kvm_run->io.port);
+            return res;
+        }
+    }
+
+    return 0;
+}
+
 static int vcpu_handle_exit(struct vcpu* vcpu)
 {
     volatile struct kvm_run* kvm_run = vcpu->kvm_run;
 
     switch (kvm_run->exit_reason) {
+    case KVM_EXIT_IO:
+        return handle_io_exit(vcpu);
+
     case KVM_EXIT_FAIL_ENTRY:
         WBVM_LOG_ERROR("VCPU %d failed entry, hw error: %#llx",
                        vcpu->id, kvm_run->fail_entry.hardware_entry_failure_reason);
