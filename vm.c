@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <pthread.h>
 
+#include <capstone/capstone.h>
+
 /** Set x86 general purpose registers for KVM */
 static void kvm_set_regs(const struct vcpu* vcpu)
 {
@@ -138,6 +140,44 @@ static void kvm_get_sregs(struct vcpu* vcpu)
     kvm_get_seg(&kvm_sregs.ldt, &x86_cpu->ldt);
 }
 
+static void dump_guest_code(struct vcpu* vcpu)
+{
+    kvm_get_regs(vcpu);
+    kvm_get_sregs(vcpu);
+
+    const struct x86_cpu_state* x86_cpu = &vcpu->x86_cpu;
+
+    gpa_t ip = ((gpa_t)x86_cpu->cs.base) + x86_cpu->eip;
+
+    uint8_t opcodes[16];
+    size_t nbytes = fetch_memory(&vcpu->vm->physical_address_space, ip, opcodes, sizeof(opcodes));
+
+    csh cs_handle;
+    if (cs_open(CS_ARCH_X86, CS_MODE_16, &cs_handle) != CS_ERR_OK) {
+        return;
+    }
+
+    cs_option(cs_handle, CS_OPT_DETAIL, CS_OPT_ON);
+
+    cs_insn* insns = NULL;
+    size_t insn_count = cs_disasm(cs_handle, opcodes, nbytes, ip, 0, &insns);
+    if (insn_count <= 0) {
+        return;
+    }
+
+    cs_close(&cs_handle);
+
+    WBVM_LOG_DEBUG("Guest code at 0x%x:", ip);
+    for (size_t i = 0; i < insn_count; ++i) {
+        WBVM_LOG_DEBUG("0x%08lx:\t%.*s %.*s",
+                       insns[i].address,
+                       (unsigned)sizeof(insns[i].mnemonic), insns[i].mnemonic,
+                       (unsigned)sizeof(insns[i].op_str), insns[i].op_str);
+    }
+
+    cs_free(insns, insn_count);
+}
+
 static void dump_vcpu_state(struct vcpu* vcpu)
 {
     kvm_get_regs(vcpu);
@@ -159,6 +199,8 @@ static void dump_vcpu_state(struct vcpu* vcpu)
     WBVM_LOG_DEBUG("CS = %04hx, DS = %04hx, ES = %04hx, SS = %04hx, FS = %04hx, GS = %04hx",
                    x86_cpu->cs.selector, x86_cpu->ds.selector, x86_cpu->es.selector,
                    x86_cpu->ss.selector, x86_cpu->fs.selector, x86_cpu->gs.selector);
+
+    dump_guest_code(vcpu);
 }
 
 static void kvm_reg_memory_region(struct vm* vm, int slot, gpa_t first, gpa_t last, bool readonly, uintptr_t hva)
