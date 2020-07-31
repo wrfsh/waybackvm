@@ -16,6 +16,7 @@ SRCS := \
 	pio.c \
 	vm.c \
 	x86.c \
+	hw/qemudbg.c \
 
 ifeq ($(CONFIG_TEST),y)
 	SRCS += test_main.c
@@ -36,6 +37,7 @@ debug release: $(TARGET)
 
 $(BINDIR):
 	mkdir -p $(BINDIR)
+	mkdir -p $(BINDIR)/hw
 
 $(BINDIR)/%.o:%.c
 	$(CC) $(CFLAGS) -c $< -o $@

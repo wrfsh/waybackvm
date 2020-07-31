@@ -416,6 +416,7 @@ static int init_devices(struct vm* vm)
         int argc;
         const char* argv[16];
     } device_list[] = {
+        {"qemudbg", 1, {"/tmp/qemudbg.log"}},
     };
 
     LIST_INIT(&vm->devices);
