@@ -30,3 +30,4 @@ struct vm
 };
 
 int init_vm(struct vm* vm, gsize_t memsize, const char* fwpath);
+int run_vm(struct vm* vm);

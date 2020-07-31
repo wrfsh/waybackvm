@@ -137,6 +137,11 @@ int init_vm(struct vm* vm, gsize_t memsize, const char* fwpath)
 
     address_space_init(&vm->physical_address_space, 0, UINT32_MAX);
 
+    res = init_vcpu(vm, &vm->vcpu, 0);
+    if (res != 0) {
+        return res;
+    }
+
     res = init_system_memory(vm, memsize);
     if (res != 0) {
         WBVM_LOG_ERROR2(res, "failed to init system memory");
@@ -149,18 +154,22 @@ int init_vm(struct vm* vm, gsize_t memsize, const char* fwpath)
         return res;
     }
 
-    commit_address_space(vm);
-
     res = init_devices(vm);
     if (res != 0) {
         WBVM_LOG_ERROR2(res, "failed to init devices");
         return res;
     }
 
-    res = init_vcpu(vm, &vm->vcpu, 0);
-    if (res != 0) {
-        return res;
-    }
+    return 0;
+}
 
+int run_vm(struct vm* vm)
+{
+    commit_address_space(vm);
+    vcpu_run(&vm->vcpu);
+
+    pthread_join(vm->vcpu.tid, NULL);
+
+    WBVM_LOG_DEBUG("VCPU thread has terminated");
     return 0;
 }

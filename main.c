@@ -21,6 +21,5 @@ int main(int argc, char** argv)
         WBVM_DIE("failed to init vm");
     }
 
-    do { } while (1);
-    return EXIT_SUCCESS;
+    return run_vm(&vm);
 }

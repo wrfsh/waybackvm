@@ -6,6 +6,8 @@
 
 #include <sys/mman.h>
 #include <pthread.h>
+#include <signal.h>
+
 #include <capstone/capstone.h>
 
 /** Set x86 general purpose registers for KVM */
@@ -204,16 +206,9 @@ static void dump_vcpu_state(struct vcpu* vcpu)
     dump_guest_code(vcpu);
 }
 
-static int handle_io_exit(struct vcpu* vcpu)
+static int handle_pio_exit(struct vcpu* vcpu)
 {
     volatile struct kvm_run* kvm_run = vcpu->kvm_run;
-
-    WBVM_LOG_DEBUG("KVM_EXIT_IO: dir = %d, size = %d, port = 0x%hx, count = %d, offset = %llx",
-            kvm_run->io.direction,
-            kvm_run->io.size,
-            kvm_run->io.port,
-            kvm_run->io.count,
-            kvm_run->io.data_offset);
 
     void* pdata = (void*)kvm_run + kvm_run->io.data_offset;
 
@@ -241,7 +236,7 @@ static int vcpu_handle_exit(struct vcpu* vcpu)
 
     switch (kvm_run->exit_reason) {
     case KVM_EXIT_IO:
-        return handle_io_exit(vcpu);
+        return handle_pio_exit(vcpu);
 
     case KVM_EXIT_FAIL_ENTRY:
         WBVM_LOG_ERROR("VCPU %d failed entry, hw error: %#llx",
@@ -256,16 +251,31 @@ static int vcpu_handle_exit(struct vcpu* vcpu)
     return 0;
 }
 
+/** Wait until we're allowed to run */
+static void wait_runnable(struct vcpu* vcpu)
+{
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGUSR1);
+
+    while (vcpu->state != VCPU_RUNNING) {
+        int sig = 0;
+        int res = sigwait(&sigset, &sig);
+        WBVM_VERIFY(res == 0 && sig == SIGUSR1);
+    }
+}
+
 static void* vcpu_thread(void* arg)
 {
     int res = 0;
-    bool should_exit = false;
+
     struct vcpu* vcpu = (struct vcpu*) arg;
     WBVM_ASSERT(vcpu);
 
-    WBVM_LOG_DEBUG("running vcpu %d", vcpu->id);
+    while (true) {
+        /* Park VCPU thread on SIGUSR1 if we're not supposed to run */
+        wait_runnable(vcpu);
 
-    do {
         res = kvm_vcpu_ioctl(vcpu->vcpufd, KVM_RUN, 0);
         if (res != 0) {
             WBVM_LOG_ERROR2(res, "KVM_RUN failed");
@@ -276,12 +286,26 @@ static void* vcpu_thread(void* arg)
 
         res = vcpu_handle_exit(vcpu);
         if (res != 0) {
-            should_exit = true;
             dump_vcpu_state(vcpu);
+            break;
         }
-    } while (!should_exit);
+    }
 
+    vcpu->state = VCPU_TERMINATED;
     return NULL;
+}
+
+void vcpu_kick(struct vcpu* vcpu)
+{
+    pthread_kill(vcpu->tid, SIGUSR1);
+}
+
+void vcpu_run(struct vcpu* vcpu)
+{
+    if (vcpu->state != VCPU_RUNNING && vcpu->state != VCPU_TERMINATED) {
+        vcpu->state = VCPU_RUNNING;
+        vcpu_kick(vcpu);
+    }
 }
 
 int init_vcpu(struct vm* vm, struct vcpu* vcpu, uint32_t id)
@@ -303,13 +327,22 @@ int init_vcpu(struct vm* vm, struct vcpu* vcpu, uint32_t id)
     vcpu->mmap_size = mmap_size;
     vcpu->kvm_run = (struct kvm_run*) mmap_ptr;
     vcpu->vm = vm;
+    vcpu->state = VCPU_STOPPED;
 
     reset_x86_bsp(&vcpu->x86_cpu);
 
     kvm_set_regs(vcpu);
     kvm_set_sregs(vcpu);
 
+    /* Set parent thread signal mask to block all for vcpu thread to inherit */
+    sigset_t sigset;
+    sigset_t oldsigset;
+    sigfillset(&sigset);
+    pthread_sigmask(SIG_BLOCK, &sigset, &oldsigset);
+
     res = pthread_create(&vcpu->tid, NULL, vcpu_thread, vcpu);
+    pthread_sigmask(SIG_SETMASK, &oldsigset, NULL);
+
     if (res != 0) {
         WBVM_LOG_ERROR2(res, "failed to create vcpu thread");
         return res;
@@ -317,4 +350,3 @@ int init_vcpu(struct vm* vm, struct vcpu* vcpu, uint32_t id)
 
     return 0;
 }
-

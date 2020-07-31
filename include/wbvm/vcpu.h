@@ -2,6 +2,14 @@
 
 #include "wbvm/x86.h"
 
+enum vcpu_state
+{
+    VCPU_STOPPED = 0,
+    VCPU_PAUSED,
+    VCPU_RUNNING,
+    VCPU_TERMINATED,
+};
+
 struct vcpu
 {
     /* Unbderlying x86 state */
@@ -12,6 +20,9 @@ struct vcpu
 
     /* VCPU id, doubles as apic id */
     uint32_t id;
+
+    /* VCPU state */
+    enum vcpu_state state;
 
     /* KVM file descriptor */
     int vcpufd;
@@ -27,3 +38,13 @@ struct vcpu
 };
 
 int init_vcpu(struct vm* vm, struct vcpu* vcpu, uint32_t id);
+
+/**
+ * Send a signal to vcpu to either lick it into userspace or notify of a state change.
+ */
+void vcpu_kick(struct vcpu* vcpu);
+
+/**
+ * Run vcpu that is currently stopped or paused
+ */
+void vcpu_run(struct vcpu* vcpu);
