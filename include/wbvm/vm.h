@@ -1,22 +1,9 @@
 #pragma once
 
-#include "wbvm/x86.h"
 #include "wbvm/memory.h"
+#include "wbvm/vcpu.h"
 
 struct vdev;
-
-struct vcpu
-{
-    struct x86_cpu_state x86_cpu;
-    struct vm* vm;
-    uint32_t id;
-    unsigned long mmap_size;
-    pthread_t tid;
-
-    /* KVM-specific state */
-    volatile struct kvm_run* kvm_run;
-    int vcpufd;
-};
 
 struct vm
 {

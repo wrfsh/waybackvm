@@ -14,6 +14,7 @@ SRCS := \
 	kvm.c \
 	memory.c \
 	pio.c \
+	vcpu.c \
 	vm.c \
 	x86.c \
 	hw/qemudbg.c \
