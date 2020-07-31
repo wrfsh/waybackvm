@@ -52,3 +52,38 @@ void map_memory_region(struct address_space* as, struct memory_region* mr, size_
     ar->mem = mr;
     ar->mem_offset = offset;
 }
+
+void* lookup_address(struct address_space* as, gpa_t gpa)
+{
+    WBVM_VERIFY(as);
+
+    struct address_range* ar = address_space_lookup_range(as, gpa);
+    if (!ar || !ar->mem) {
+        return NULL;
+    }
+
+    return ar->mem->mem + ar->mem_offset;
+}
+
+gsize_t fetch_memory(struct address_space* as, gpa_t gpa, void* buf, gsize_t bufsize)
+{
+    WBVM_VERIFY(as);
+
+    gsize_t bytes_rem = bufsize;
+    while (bytes_rem > 0) {
+        struct address_range* ar = address_space_lookup_range(as, gpa);
+        if (!ar || !ar->mem) {
+            break;
+        }
+
+        gsize_t nbytes = WBVM_MIN(bytes_rem, ar->mem->size - ar->mem_offset);
+        size_t offset = ar->mem_offset + (gpa - ar->first);
+        memcpy(buf, ar->mem->mem + offset, nbytes);
+
+        gpa += nbytes;
+        buf += nbytes;
+        bytes_rem -= nbytes;
+    }
+
+    return bufsize - bytes_rem;
+}

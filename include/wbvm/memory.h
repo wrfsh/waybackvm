@@ -60,3 +60,26 @@ void release_memory_region(struct memory_region* mr);
  *          Last addressable GPA is calculated from region size and offset.
  */
 void map_memory_region(struct address_space* as, struct memory_region* mr, size_t offset, gpa_t gpa);
+
+/**
+ * Lookup mapped host address for this gpa.
+ *
+ * \as      Address space
+ * \gpa     Guest physical address to lookup
+ *
+ * Returns either NULL if this gpa is not mapped or a valid host VA.
+ */
+void* lookup_address(struct address_space* as, gpa_t gpa);
+
+/**
+ * Lookup gpa a copy a number of mapped memory bytes into caller buffer starting at this gpa.
+ *
+ * \as      Address space
+ * \gpa     Guest physical address to start from
+ * \buf     Caller buffer to store bytes
+ * \bufsize Size of caller buffer in bytes
+ *
+ * Return number of bytes really copied.
+ * Can be less than bufsize if there is no memory mapped at the end of the address range.
+ */
+gsize_t fetch_memory(struct address_space* as, gpa_t gpa, void* buf, gsize_t bufsize);
